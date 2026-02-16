@@ -74,3 +74,5 @@ export function toLocationContext(location: NormalizedLocation): {
     LocationIsLive: resolved.isLive,
   };
 }
+
+console.log("haaha");
