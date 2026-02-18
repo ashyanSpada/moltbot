@@ -26,6 +26,16 @@ export function registerPreActionHooks(program: Command, programVersion: string)
   program.hook("preAction", async (_thisCommand, actionCommand) => {
     setProcessTitleForCommand(actionCommand);
     const argv = process.argv;
+
+    // Phase 3: Handle global --profile option for multi-workspace support
+    const profileIndex = argv.indexOf("--profile");
+    if (profileIndex !== -1 && profileIndex + 1 < argv.length) {
+      const profileValue = argv[profileIndex + 1];
+      if (profileValue && !profileValue.startsWith("-")) {
+        process.env.OPENCLAW_PROFILE = profileValue;
+      }
+    }
+
     if (hasHelpOrVersion(argv)) {
       return;
     }

@@ -14,6 +14,12 @@ export function buildProgram() {
   configureProgramHelp(program, ctx);
   registerPreActionHooks(program, ctx.programVersion);
 
+  // Phase 3: Add global --profile option for multi-workspace support
+  program.option(
+    "--profile <name>",
+    "OpenClaw workspace profile (default: env OPENCLAW_PROFILE or 'default')",
+  );
+
   registerProgramCommands(program, ctx, argv);
 
   return program;

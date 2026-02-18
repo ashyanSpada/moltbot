@@ -8,7 +8,6 @@
  */
 
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import type { WorkspaceContext } from "../config/types.global.js";
 import { resolveStateDir } from "../config/paths.js";
@@ -172,7 +171,9 @@ export function validateWorkspaceContext(ctx: WorkspaceContext): void {
   for (const key of required) {
     const value = ctx[key as keyof WorkspaceContext];
     if (!value || typeof value !== "string" || !value.trim()) {
-      throw new Error(`WorkspaceContext.${key} is invalid: "${value}"`);
+      const valueDescription =
+        typeof value === "string" ? value : value === undefined ? "undefined" : JSON.stringify(value);
+      throw new Error(`WorkspaceContext.${key} is invalid: "${valueDescription}"`);
     }
   }
 

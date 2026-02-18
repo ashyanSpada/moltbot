@@ -64,6 +64,7 @@ const coreEntries: CoreCliEntry[] = [
     },
   },
   {
+<<<<<<< HEAD
     commands: [
       {
         name: "configure",
@@ -76,6 +77,14 @@ const coreEntries: CoreCliEntry[] = [
       const mod = await import("./register.configure.js");
       mod.registerConfigureCommand(program);
     },
+=======
+    id: "profile",
+    register: ({ program }) => registerProfileCommand(program),
+  },
+  {
+    id: "configure",
+    register: ({ program }) => registerConfigureCommand(program),
+>>>>>>> 967c18bbd (chore: Phase 3a - CLI global option and profile management commands)
   },
   {
     commands: [
@@ -122,6 +131,19 @@ const coreEntries: CoreCliEntry[] = [
   {
     commands: [
       {
+        name: "profile",
+        description: "Manage OpenClaw workspace profiles",
+        hasSubcommands: true,
+      },
+    ],
+    register: async ({ program }) => {
+      const mod = await import("./register.profile.js");
+      mod.registerProfileCommand(program);
+    },
+  },
+  {
+    commands: [
+      {
         name: "message",
         description: "Send, read, and manage messages",
         hasSubcommands: true,
@@ -132,14 +154,6 @@ const coreEntries: CoreCliEntry[] = [
       mod.registerMessageCommands(program, ctx);
     },
   },
-  {
-    commands: [
-      {
-        name: "memory",
-        description: "Search and reindex memory files",
-        hasSubcommands: true,
-      },
-    ],
     register: async ({ program }) => {
       const mod = await import("../memory-cli.js");
       mod.registerMemoryCli(program);
