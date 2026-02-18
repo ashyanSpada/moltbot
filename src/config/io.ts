@@ -1166,8 +1166,8 @@ export function clearConfigCache(): void {
   configCache = null;
 }
 
-export function loadConfig(): OpenClawConfig {
-  const io = createConfigIO();
+export function loadConfig(opts?: { profile?: string }): OpenClawConfig {
+  const io = createConfigIO({ profile: opts?.profile });
   const configPath = io.configPath;
   const now = Date.now();
   if (shouldUseConfigCache(process.env)) {

@@ -1,5 +1,6 @@
 import os from "node:os";
 import path from "node:path";
+import { getActiveWorkspaceContext } from "../../agents/workspace-context.js";
 import { expandHomePrefix, resolveRequiredHomeDir } from "../../infra/home-dir.js";
 import { DEFAULT_AGENT_ID, normalizeAgentId } from "../../routing/session-key.js";
 import { resolveStateDir } from "../paths.js";
@@ -9,6 +10,15 @@ function resolveAgentSessionsDir(
   env: NodeJS.ProcessEnv = process.env,
   homedir: () => string = () => resolveRequiredHomeDir(env, os.homedir),
 ): string {
+  // Check if a workspace context is active (Phase 2: workspace isolation)
+  const wsContext = getActiveWorkspaceContext();
+  if (wsContext) {
+    // Use workspace-specific sessions directory
+    const id = normalizeAgentId(agentId ?? DEFAULT_AGENT_ID);
+    return path.join(wsContext.sessionsDir, `agents/${id}/sessions`);
+  }
+
+  // Fallback to default behavior (backward compatible)
   const root = resolveStateDir(env, homedir);
   const id = normalizeAgentId(agentId ?? DEFAULT_AGENT_ID);
   return path.join(root, "agents", id, "sessions");

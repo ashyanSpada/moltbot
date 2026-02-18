@@ -50,6 +50,7 @@ type GatewayRunOpts = {
   rawStreamPath?: unknown;
   dev?: boolean;
   reset?: boolean;
+  profile?: unknown;
 };
 
 const gatewayLog = createSubsystemLogger("gateway");
@@ -139,7 +140,10 @@ async function runGatewayCommand(opts: GatewayRunOpts) {
     await ensureDevGatewayConfig({ reset: Boolean(opts.reset) });
   }
 
-  const cfg = loadConfig();
+  // Parse and validate profile option
+  const profileRaw = toOptionString(opts.profile);
+
+  const cfg = loadConfig({ profile: profileRaw || undefined });
   const portOverride = parsePort(opts.port);
   if (opts.port !== undefined && portOverride === null) {
     defaultRuntime.error("Invalid port");
@@ -312,6 +316,7 @@ async function runGatewayCommand(opts: GatewayRunOpts) {
       start: async () =>
         await startGatewayServer(port, {
           bind,
+          profile: profileRaw || undefined,
           auth:
             authMode || passwordRaw || tokenRaw || authModeRaw
               ? {
@@ -363,6 +368,10 @@ export function addGatewayRunCommand(cmd: Command): Command {
     .option(
       "--bind <mode>",
       'Bind mode ("loopback"|"lan"|"tailnet"|"auto"|"custom"). Defaults to config gateway.bind (or loopback).',
+    )
+    .option(
+      "--profile <name>",
+      "OpenClaw workspace profile (default: uses env OPENCLAW_PROFILE or 'default')",
     )
     .option(
       "--token <token>",

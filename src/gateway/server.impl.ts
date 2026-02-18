@@ -5,6 +5,12 @@ import { registerSkillsChangeListener } from "../agents/skills/refresh.js";
 import { initSubagentRegistry } from "../agents/subagent-registry.js";
 import { getTotalPendingReplies } from "../auto-reply/reply/dispatcher-registry.js";
 import type { CanvasHostServer } from "../canvas-host/server.js";
+import {
+  ensureWorkspaceStructure,
+  getActiveWorkspaceContext,
+  resolveWorkspaceContext,
+  setActiveWorkspaceContext,
+} from "../agents/workspace-context.js";
 import { type ChannelId, listChannelPlugins } from "../channels/plugins/index.js";
 import { formatCliCommand } from "../cli/command-format.js";
 import { createDefaultDeps } from "../cli/deps.js";
@@ -109,6 +115,11 @@ export type GatewayServer = {
 };
 
 export type GatewayServerOptions = {
+  /**
+   * OpenClaw workspace profile name (e.g. 'default', 'staging', 'production').
+   * If not specified, uses OPENCLAW_PROFILE env var or 'default'.
+   */
+  profile?: string;
   /**
    * Bind address policy for the Gateway WebSocket/HTTP server.
    * - loopback: 127.0.0.1
@@ -227,7 +238,13 @@ export async function startGatewayServer(
     }
   }
 
-  const cfgAtStart = loadConfig();
+  // Resolve and initialize workspace context for the profile
+  const profile = opts.profile || process.env.OPENCLAW_PROFILE || "default";
+  const wsContext = await resolveWorkspaceContext({ profile });
+  await ensureWorkspaceStructure(wsContext);
+  setActiveWorkspaceContext(wsContext);
+
+  const cfgAtStart = loadConfig({ profile });
   const diagnosticsEnabled = isDiagnosticsEnabled(cfgAtStart);
   if (diagnosticsEnabled) {
     startDiagnosticHeartbeat();
