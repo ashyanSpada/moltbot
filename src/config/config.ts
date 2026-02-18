@@ -7,6 +7,17 @@ export {
   readConfigFileSnapshotForWrite,
   resolveConfigSnapshotHash,
   writeConfigFile,
+  // NEW: Re-export multi-workspace support types and functions
+  type GlobalConfig,
+  type ProfileConfig,
+  type WorkspaceContext,
+  isLegacyConfigFormat,
+  migrateConfigToGlobalFormat,
+  getProfileConfig,
+  setProfileConfig,
+  listProfileNames,
+  deleteProfile,
+  getDefaultProfileName,
 } from "./io.js";
 export { migrateLegacyConfig } from "./legacy-migrate.js";
 export * from "./paths.js";

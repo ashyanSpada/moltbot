@@ -6,6 +6,8 @@ import { isDeepStrictEqual } from "node:util";
 import JSON5 from "json5";
 import { loadDotEnv } from "../infra/dotenv.js";
 import { resolveRequiredHomeDir } from "../infra/home-dir.js";
+import type { GlobalConfig, ProfileConfig, WorkspaceContext } from "./types.global.js";
+import type { OpenClawConfig, ConfigFileSnapshot, LegacyConfigIssue } from "./types.js";
 import {
   loadShellEnvFallback,
   resolveShellEnvFallbackTimeoutMs,
@@ -38,7 +40,13 @@ import { applyMergePatch } from "./merge-patch.js";
 import { normalizeConfigPaths } from "./normalize-paths.js";
 import { resolveConfigPath, resolveDefaultConfigCandidates, resolveStateDir } from "./paths.js";
 import { applyConfigOverrides } from "./runtime-overrides.js";
-import type { OpenClawConfig, ConfigFileSnapshot, LegacyConfigIssue } from "./types.js";
+import {
+  isLegacyConfigFormat,
+  migrateConfigToGlobalFormat,
+  getProfileConfig,
+  setProfileConfig,
+  listProfileNames,
+} from "./types.global.js";
 import {
   validateConfigObjectRawWithPlugins,
   validateConfigObjectWithPlugins,
@@ -48,6 +56,18 @@ import { compareOpenClawVersions } from "./version.js";
 // Re-export for backwards compatibility
 export { CircularIncludeError, ConfigIncludeError } from "./includes.js";
 export { MissingEnvVarError } from "./env-substitution.js";
+
+// Re-export types and utilities for multi-workspace support
+export type { GlobalConfig, ProfileConfig, WorkspaceContext } from "./types.global.js";
+export {
+  isLegacyConfigFormat,
+  migrateConfigToGlobalFormat,
+  getProfileConfig,
+  setProfileConfig,
+  listProfileNames,
+  deleteProfile,
+  getDefaultProfileName,
+} from "./types.global.js";
 
 const SHELL_ENV_EXPECTED_KEYS = [
   "OPENAI_API_KEY",
@@ -120,6 +140,50 @@ export type ReadConfigFileSnapshotForWriteResult = {
   snapshot: ConfigFileSnapshot;
   writeOptions: ConfigWriteOptions;
 };
+
+/**
+ * Load GlobalConfig from file, with automatic migration support.
+ * If file contains legacy config, wraps it in GlobalConfig with profiles.default.
+ */
+function loadGlobalConfigRaw(
+  raw: string,
+  json5: { parse: (value: string) => unknown },
+): GlobalConfig {
+  const parsed = json5.parse(raw);
+
+  // Check if this is legacy format (direct OpenClawConfig)
+  if (isLegacyConfigFormat(parsed)) {
+    const legacyConfig = parsed;
+    const migrated = migrateConfigToGlobalFormat(legacyConfig);
+    return migrated;
+  }
+
+  // Otherwise, treat as GlobalConfig
+  const maybeGlobal = parsed as GlobalConfig;
+  if (!maybeGlobal.profiles) {
+    maybeGlobal.profiles = {};
+  }
+
+  return maybeGlobal;
+}
+
+/**
+ * Load a specific profile config from GlobalConfig.
+ * Returns profile config or empty config if not found.
+ */
+function loadProfileConfigFromGlobal(
+  globalConfig: GlobalConfig,
+  profileName: string,
+): ProfileConfig {
+  const profile = getProfileConfig(globalConfig, profileName);
+  if (profile) {
+    return profile;
+  }
+
+  // If profile not found, return empty config
+  // (will be initialized later by defaults/validation)
+  return {};
+}
 
 function hashConfigRaw(raw: string | null): string {
   return crypto
@@ -396,6 +460,12 @@ export type ConfigIoDeps = {
   homedir?: () => string;
   configPath?: string;
   logger?: Pick<typeof console, "error" | "warn">;
+  /**
+   * NEW: Workspace profile name for multi-workspace support.
+   * If provided, loads config from GlobalConfig.profiles[profile].
+   * If omitted, loads the entire config as-is (backward compatible).
+   */
+  profile?: string;
 };
 
 function warnOnConfigMiskeys(raw: unknown, logger: Pick<typeof console, "warn">): void {
@@ -457,6 +527,7 @@ function normalizeDeps(overrides: ConfigIoDeps = {}): Required<ConfigIoDeps> {
       overrides.homedir ?? (() => resolveRequiredHomeDir(overrides.env ?? process.env, os.homedir)),
     configPath: overrides.configPath ?? "",
     logger: overrides.logger ?? console,
+    profile: overrides.profile ?? "", // Empty string means "not specified (backward compat)"
   };
 }
 
@@ -543,8 +614,15 @@ export function createConfigIO(overrides: ConfigIoDeps = {}) {
       }
       const raw = deps.fs.readFileSync(configPath, "utf-8");
       const parsed = deps.json5.parse(raw);
+
+      let configToProcess = parsed;
+      if (deps.profile && typeof parsed === "object" && parsed !== null) {
+        const globalConfig = loadGlobalConfigRaw(raw, deps.json5);
+        configToProcess = loadProfileConfigFromGlobal(globalConfig, deps.profile);
+      }
+
       const { resolvedConfigRaw: resolvedConfig } = resolveConfigForRead(
-        resolveConfigIncludesForRead(parsed, configPath, deps),
+        resolveConfigIncludesForRead(configToProcess, configPath, deps),
         deps.env,
       );
       warnOnConfigMiskeys(resolvedConfig, deps.logger);
